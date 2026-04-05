@@ -1,0 +1,28 @@
+<div class="history-header">
+  <h2>Chat History</h2>
+  <button class="close-btn" (click)="closed.emit()" aria-label="Close history panel">✕</button>
+</div>
+
+<div class="history-list" role="list">
+  @for (conv of conversations(); track conv.id) {
+    <button
+      class="history-item"
+      [class.active]="conv.id === activeId()"
+      (click)="selected.emit(conv)"
+      role="listitem"
+    >
+      <div class="item-content">
+        <span class="item-title">{{ conv.title }}</span>
+        <span class="item-date">{{ conv.updatedAt | date:'MMM d, h:mm a' }}</span>
+      </div>
+      <button
+        class="delete-btn"
+        (click)="onDelete($event, conv.id)"
+        aria-label="Delete conversation"
+        title="Delete"
+      >🗑</button>
+    </button>
+  } @empty {
+    <p class="empty">No conversations yet</p>
+  }
+</div>

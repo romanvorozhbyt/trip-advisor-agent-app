@@ -1,0 +1,91 @@
+<div class="layout" [class.sidebar-open]="sidebarOpen()">
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <app-chat-history
+      [conversations]="storage.conversations()"
+      [activeId]="conversationId"
+      (selected)="loadConversation($event)"
+      (deleted)="deleteConversation($event)"
+      (closed)="sidebarOpen.set(false)"
+    />
+  </aside>
+
+  <div class="chat-container">
+    <header class="chat-header" role="banner">
+      <div class="header-left">
+        <button class="icon-btn" (click)="toggleSidebar()" aria-label="Toggle chat history">
+          ☰
+        </button>
+        <div class="header-title">
+          <span class="logo" aria-hidden="true">🌍</span>
+          <h1>Trip Advisor Agent</h1>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="new-chat-btn" (click)="newConversation()" aria-label="Start new conversation">
+          + New Chat
+        </button>
+        @if (auth.user(); as user) {
+          <div class="user-menu">
+            @if (user.pictureUrl) {
+              <img class="avatar" [src]="user.pictureUrl" [alt]="user.displayName" referrerpolicy="no-referrer" />
+            } @else {
+              <div class="avatar avatar-fallback" aria-hidden="true">{{ user.displayName[0] }}</div>
+            }
+            <button class="sign-out-btn" (click)="auth.signOut()" aria-label="Sign out">Sign out</button>
+          </div>
+        }
+      </div>
+    </header>
+
+    <div class="messages" #messagesContainer role="list" aria-label="Conversation">
+      @if (messages().length === 0) {
+        <div class="welcome" role="region" aria-label="Welcome">
+          <div class="welcome-icon" aria-hidden="true">✈️</div>
+          <h2>Plan your next trip!</h2>
+          <p>Ask me anything about travel destinations, itineraries, packing tips, or budget planning.</p>
+          <div class="suggestions" role="group" aria-label="Quick suggestions">
+            <button class="suggestion" (click)="sendSuggestion('What are the best places to visit in Japan?')">
+              🇯🇵 Best places in Japan
+            </button>
+            <button class="suggestion" (click)="sendSuggestion('Help me plan a 5-day trip to Paris')">
+              🗼 5-day Paris trip
+            </button>
+            <button class="suggestion" (click)="sendSuggestion('What should I pack for a tropical vacation?')">
+              🧳 Tropical packing list
+            </button>
+          </div>
+        </div>
+      }
+
+      @for (msg of messages(); track msg) {
+        <app-chat-message [message]="msg" />
+      }
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          [ngModel]="userInput()"
+          (ngModelChange)="userInput.set($event)"
+          (keydown)="onKeyDown($event)"
+          placeholder="Ask about your next trip..."
+          rows="1"
+          [disabled]="isLoading()"
+          aria-label="Chat message"
+        ></textarea>
+        <button
+          class="send-btn"
+          (click)="send()"
+          [disabled]="isLoading() || !userInput().trim()"
+          aria-label="Send message"
+        >
+          @if (isLoading()) {
+            <span class="spinner" aria-hidden="true"></span>
+          } @else {
+            <span aria-hidden="true">➤</span>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,17 @@
+<div class="avatar">
+  @if (message().role === 'assistant') {
+    <span class="avatar-icon" aria-hidden="true">🌍</span>
+  } @else {
+    <span class="avatar-icon" aria-hidden="true">👤</span>
+  }
+</div>
+<div class="bubble">
+  @if (message().role === 'user') {
+    <p class="content">{{ message().content }}</p>
+  } @else {
+    <div class="content markdown" [innerHTML]="renderedContent()"></div>
+    @if (message().isStreaming) {
+      <span class="cursor" aria-hidden="true">▊</span>
+    }
+  }
+</div>

@@ -1,0 +1,38 @@
+@TripAdvisorAgent.WebApi_HostAddress = http://localhost:5210
+
+### Chat - Send a message (new conversation)
+POST {{TripAdvisorAgent.WebApi_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "What are the best places to visit in Europe?"
+}
+
+### Chat - Continue conversation (replace conversationId with actual value)
+POST {{TripAdvisorAgent.WebApi_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "Tell me more about Barcelona",
+  "conversationId": "REPLACE_WITH_CONVERSATION_ID"
+}
+
+### Chat - Stream response
+POST {{TripAdvisorAgent.WebApi_HostAddress}}/api/chat/stream
+Content-Type: application/json
+
+{
+  "message": "Plan a 5-day trip to Tokyo on a budget"
+}
+
+### Delete conversation
+DELETE {{TripAdvisorAgent.WebApi_HostAddress}}/api/chat/REPLACE_WITH_CONVERSATION_ID
+
+### Knowledge - Ingest new knowledge
+POST {{TripAdvisorAgent.WebApi_HostAddress}}/api/knowledge
+Content-Type: application/json
+
+{
+  "content": "Lisbon, Portugal: Affordable European capital with stunning views, historic trams, and pastel de nata pastries. Visit Alfama district, Belém Tower, and Time Out Market. Best in spring or early fall. One of the most budget-friendly capitals in Western Europe.",
+  "category": "destination"
+}

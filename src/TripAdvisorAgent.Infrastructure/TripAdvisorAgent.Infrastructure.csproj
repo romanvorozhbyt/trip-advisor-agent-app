@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);SKEXP0010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.74.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" Version="1.74.0-preview" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TripAdvisorAgent.Core\TripAdvisorAgent.Core.csproj" />
+  </ItemGroup>
+
+</Project>

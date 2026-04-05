@@ -1,0 +1,32 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - qdrant
+    env_file:
+      - .env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Qdrant__Host=qdrant
+      - Qdrant__Port=6334
+      - Qdrant__UseHttps=false
+    volumes:
+      - sqlite_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+  sqlite_data:

@@ -23,18 +23,26 @@ public class KnowledgeBaseService(
     }
 
     /// <inheritdoc />
-    public async Task IngestAsync(string content, string category, CancellationToken cancellationToken)
+    public async Task IngestAsync(string content, string category, Guid? id = null, CancellationToken cancellationToken = default)
     {
         var embedding = await embeddingGenerator.GenerateVectorAsync(content, cancellationToken: cancellationToken);
 
         var record = new TripKnowledgeRecord
         {
+            Id = id ?? Guid.NewGuid(),
             Content = content,
             Category = category,
             ContentEmbedding = embedding
         };
 
         await _collection.UpsertAsync(record, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RecordExistsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var record = await _collection.GetAsync(id, cancellationToken: cancellationToken);
+        return record is not null;
     }
 
     /// <inheritdoc />

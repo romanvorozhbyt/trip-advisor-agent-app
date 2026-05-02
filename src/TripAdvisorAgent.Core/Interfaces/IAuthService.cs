@@ -11,6 +11,11 @@ public interface IAuthService
     /// Validates a Google ID token, creates or retrieves the user, and returns a JWT + user info.
     /// </summary>
     Task<AuthResult> SignInWithGoogleAsync(string idToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Issues a new JWT for an already-authenticated user identified by their user ID.
+    /// </summary>
+    Task<AuthResult> RefreshTokenAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

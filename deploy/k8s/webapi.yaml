@@ -1,0 +1,211 @@
+# ── Namespace ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trip-advisor
+  labels:
+    app.kubernetes.io/managed-by: cloudformation
+---
+# ── ConfigMap: non-secret runtime configuration ───────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapi-config
+  namespace: trip-advisor
+data:
+  GitHubModels__Endpoint: "https://models.inference.ai.azure.com"
+  GitHubModels__ModelId: "gpt-4o-mini"
+  GitHubModels__EmbeddingModelId: "text-embedding-3-small"
+  FlightSearch__Provider: "AirLabs"
+  News__FetchIntervalHours: "6"
+  News__MaxItemsPerFeed: "20"
+  News__ArticleMaxLength: "800"
+  Qdrant__UseHttps: "true"
+  Qdrant__Port: "6334"
+---
+# ── Secret reference: map SSM / Secrets Manager values via External Secrets ───
+# If you use the External Secrets Operator (recommended), replace the
+# placeholder values with real ExternalSecret resources. Otherwise, create
+# this Secret manually:
+#   kubectl create secret generic webapi-secrets -n trip-advisor \
+#     --from-literal=GitHubModels__ApiKey=<key> \
+#     --from-literal=Qdrant__Host=<host> \
+#     --from-literal=Qdrant__ApiKey=<key> \
+#     --from-literal=ConnectionStrings__Sqlite=/data/app.db \
+#     --from-literal=GoogleAuth__ClientId=<id> \
+#     --from-literal=Jwt__Secret=<secret> \
+#     --from-literal=Jwt__Issuer=https://api.trip-advisor.example.com \
+#     --from-literal=Jwt__Audience=trip-advisor-app
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webapi-secrets
+  namespace: trip-advisor
+type: Opaque
+# stringData values must be filled in before applying, or replaced by
+# ExternalSecret / Sealed Secrets.
+stringData:
+  GitHubModels__ApiKey: "REPLACE_ME"
+  Qdrant__Host: "REPLACE_ME"
+  Qdrant__ApiKey: "REPLACE_ME"
+  ConnectionStrings__Sqlite: "/data/app.db"
+  GoogleAuth__ClientId: "REPLACE_ME"
+  Jwt__Secret: "REPLACE_ME"
+  Jwt__Issuer: "https://api.trip-advisor.example.com"
+  Jwt__Audience: "trip-advisor-app"
+  Amadeus__ClientId: "REPLACE_ME"
+  Amadeus__ClientSecret: "REPLACE_ME"
+  AirLabs__ApiKey: "REPLACE_ME"
+---
+# ── PersistentVolumeClaim: SQLite on EBS ─────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webapi-sqlite-pvc
+  namespace: trip-advisor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2          # AWS EBS gp2; use gp3 if available
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ── Deployment ────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapi
+  namespace: trip-advisor
+  labels:
+    app: webapi
+    version: latest
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapi
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: webapi
+    spec:
+      serviceAccountName: webapi
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: webapi
+          # Replace with the actual ECR image URI (passed as CloudFormation output
+          # or from your CI pipeline).
+          image: "REPLACE_WITH_ECR_IMAGE_URI"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: webapi-config
+            - secretRef:
+                name: webapi-secrets
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: webapi-sqlite-pvc
+---
+# ── ServiceAccount (for IRSA if needed later) ─────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webapi
+  namespace: trip-advisor
+  annotations: {}
+  # To attach an IAM role via IRSA, add:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/trip-advisor-webapi-role
+---
+# ── Service: NLB (consumed by API Gateway VPC Link) ───────────────────────────
+# The AWS Load Balancer Controller creates an internal NLB when
+# service.beta.kubernetes.io/aws-load-balancer-type: "external" and
+# service.beta.kubernetes.io/aws-load-balancer-scheme: "internal" are set.
+# After the Service is created, copy the EXTERNAL-IP DNS name and update the
+# /trip-advisor-agent/<env>/nlb-dns SSM parameter so the CloudFormation stack
+# can wire up the API Gateway integration.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapi-nlb
+  namespace: trip-advisor
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+spec:
+  type: LoadBalancer
+  selector:
+    app: webapi
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# ── HorizontalPodAutoscaler ───────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapi-hpa
+  namespace: trip-advisor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapi
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

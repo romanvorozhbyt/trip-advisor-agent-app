@@ -1,28 +1,49 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using TripAdvisorAgent.Core.Interfaces;
 using TripAdvisorAgent.Core.Models;
 
 namespace TripAdvisorAgent.Infrastructure.Services;
 
 /// <summary>
-/// Provides RAG-augmented chat using Semantic Kernel chat completion and a knowledge base.
+/// Provides RAG-augmented, agentic chat using Semantic Kernel with automatic function calling.
+/// The kernel's registered plugins (e.g. TransportationAgentPlugin) are invoked automatically
+/// by the LLM when it needs to fetch real-time data such as flight search results.
 /// </summary>
 public class ChatService(
     IChatCompletionService chatCompletion,
-    IKnowledgeBaseService knowledgeBase) : IChatService
+    IKnowledgeBaseService knowledgeBase,
+    Kernel kernel,
+    ILogger<ChatService> logger) : IChatService
 {
     private readonly ConcurrentDictionary<string, ChatHistory> _conversations = new();
 
-    private const string SystemPrompt = """
+    private static readonly OpenAIPromptExecutionSettings ExecutionSettings = new()
+    {
+        FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+    };
+
+    private static string BuildSystemPrompt() => $"""
         You are an expert trip advisor assistant. You help users plan trips, recommend destinations,
         provide travel tips, suggest itineraries, and answer travel-related questions.
 
-        Use the provided context to give accurate, helpful advice. If the context doesn't contain
-        relevant information, use your general knowledge but mention that the information is from
-        your general knowledge rather than from the knowledge base.
+        Today's date is {DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}. When the user mentions
+        relative dates like "next week", "tomorrow", or "this weekend", calculate the exact date
+        relative to today and pass it to the flight search tool in YYYY-MM-DD format.
+
+        You have access to a real-time flight search tool. When the user asks about flights,
+        transportation options, or travel routes, use the search_flights function to retrieve
+        live data. Always use IATA airport codes (e.g., JFK, LHR, CDG) when calling the tool.
+        If the user provides city names, convert them to IATA codes before searching.
+
+        Use the provided knowledge base context to give accurate, helpful advice. If neither the
+        context nor the search results contain relevant information, use your general knowledge
+        but mention that.
 
         Be friendly, concise, and practical in your recommendations.
         """;
@@ -31,13 +52,20 @@ public class ChatService(
     public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken cancellationToken)
     {
         var conversationId = request.ConversationId ?? Guid.NewGuid().ToString();
-        var history = _conversations.GetOrAdd(conversationId, _ => new ChatHistory(SystemPrompt));
+        var history = _conversations.GetOrAdd(conversationId, _ => new ChatHistory(BuildSystemPrompt()));
 
         var augmentedMessage = await BuildAugmentedMessageAsync(request.Message, cancellationToken);
         history.AddUserMessage(augmentedMessage);
 
-        var response = await chatCompletion.GetChatMessageContentAsync(history, cancellationToken: cancellationToken);
+        logger.LogInformation("[Chat] Sending message to LLM. ConversationId={ConversationId} HistoryLength={Length}",
+            conversationId, history.Count);
+
+        var response = await chatCompletion.GetChatMessageContentAsync(
+            history, ExecutionSettings, kernel, cancellationToken);
         var assistantMessage = response.Content ?? string.Empty;
+
+        logger.LogInformation("[Chat] LLM responded. ConversationId={ConversationId} FunctionCalls={Calls}",
+            conversationId, response.Metadata?.ContainsKey("ToolCalls") == true ? "yes" : "no");
 
         history.AddAssistantMessage(assistantMessage);
 
@@ -50,13 +78,17 @@ public class ChatService(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var conversationId = request.ConversationId ?? Guid.NewGuid().ToString();
-        var history = _conversations.GetOrAdd(conversationId, _ => new ChatHistory(SystemPrompt));
+        var history = _conversations.GetOrAdd(conversationId, _ => new ChatHistory(BuildSystemPrompt()));
 
         var augmentedMessage = await BuildAugmentedMessageAsync(request.Message, cancellationToken);
         history.AddUserMessage(augmentedMessage);
 
+        logger.LogInformation("[ChatStream] Sending streaming message to LLM. ConversationId={ConversationId} HistoryLength={Length}",
+            conversationId, history.Count);
+
         var fullResponse = new StringBuilder();
-        await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(history, cancellationToken: cancellationToken))
+        await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(
+            history, ExecutionSettings, kernel, cancellationToken))
         {
             if (chunk.Content is not null)
             {

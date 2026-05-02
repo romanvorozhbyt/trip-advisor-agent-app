@@ -37,6 +37,19 @@ public class AuthService(
         return new AuthResult(accessToken, expiresAt, user);
     }
 
+    public async Task<AuthResult> RefreshTokenAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(userId, out var userGuid))
+            throw new InvalidOperationException($"Invalid user ID format: '{userId}'.");
+
+        var user = await userService.GetByIdAsync(userGuid, cancellationToken)
+            ?? throw new InvalidOperationException($"User '{userId}' not found.");
+
+        var (accessToken, expiresAt) = GenerateJwt(user);
+
+        return new AuthResult(accessToken, expiresAt, user);
+    }
+
     private (string Token, DateTime ExpiresAt) GenerateJwt(User user)
     {
         var jwt = jwtOptions.Value;

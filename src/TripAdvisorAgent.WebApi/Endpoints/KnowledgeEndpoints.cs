@@ -14,7 +14,7 @@ public static class KnowledgeEndpoints
             if (string.IsNullOrWhiteSpace(request.Content))
                 return Results.BadRequest(new { error = "Content is required." });
 
-            await knowledgeBase.IngestAsync(request.Content, request.Category, ct);
+            await knowledgeBase.IngestAsync(request.Content, request.Category, cancellationToken: ct);
             return Results.Created();
         });
     }

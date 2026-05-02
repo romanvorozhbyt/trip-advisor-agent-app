@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using TripAdvisorAgent.Core.Interfaces;
 using TripAdvisorAgent.Infrastructure;
 using TripAdvisorAgent.Infrastructure.Data;
@@ -7,6 +8,16 @@ using TripAdvisorAgent.WebApi.Endpoints;
 using TripAdvisorAgent.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, lc) => lc
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: "logs/app-.log",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+    ));
 
 // Infrastructure (Semantic Kernel, Vector Store, SQLite, Services)
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -43,6 +54,7 @@ if (app.Environment.IsDevelopment())
 app.MapAuthEndpoints();
 app.MapChatEndpoints();
 app.MapKnowledgeEndpoints();
+app.MapNewsIngestionEndpoints();
 app.MapUserEndpoints();
 
 app.Run();

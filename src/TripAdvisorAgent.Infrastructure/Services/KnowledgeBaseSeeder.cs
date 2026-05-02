@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using TripAdvisorAgent.Core.Interfaces;
 
 namespace TripAdvisorAgent.Infrastructure.Services;
@@ -7,6 +9,38 @@ namespace TripAdvisorAgent.Infrastructure.Services;
 /// </summary>
 public static class KnowledgeBaseSeeder
 {
+    // Stable DNS namespace GUID used as the UUID v5 namespace for deterministic IDs.
+    private static readonly Guid DnsNamespace = Guid.Parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+
+    /// <summary>
+    /// Creates a deterministic UUID v5 from a namespace GUID and a UTF-8 string name.
+    /// </summary>
+    private static Guid DeterministicId(string content)
+    {
+        var namespaceBytes = DnsNamespace.ToByteArray();
+        // UUID v5 requires big-endian namespace bytes
+        SwapEndianness(namespaceBytes);
+        var nameBytes = Encoding.UTF8.GetBytes(content);
+
+        byte[] hash = SHA1.HashData([.. namespaceBytes, .. nameBytes]);
+
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // version 5
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // variant RFC 4122
+
+        var guidBytes = hash[..16];
+        SwapEndianness(guidBytes);
+        return new Guid(guidBytes);
+    }
+
+    private static void SwapEndianness(byte[] b)
+    {
+        // Swap time_low (0-3), time_mid (4-5), time_hi_and_version (6-7)
+        (b[0], b[3]) = (b[3], b[0]);
+        (b[1], b[2]) = (b[2], b[1]);
+        (b[4], b[5]) = (b[5], b[4]);
+        (b[6], b[7]) = (b[7], b[6]);
+    }
+
     private static readonly (string Content, string Category)[] SeedEntries =
     [
         (
@@ -44,15 +78,21 @@ public static class KnowledgeBaseSeeder
     ];
 
     /// <summary>
-    /// Initializes the knowledge base and seeds it with travel data.
+    /// Initializes the knowledge base and seeds it with travel data if not already seeded.
     /// </summary>
     public static async Task SeedAsync(IKnowledgeBaseService knowledgeBase, CancellationToken cancellationToken = default)
     {
         await knowledgeBase.InitializeAsync(cancellationToken);
 
+        // Check the first entry — if it exists, the collection is already seeded.
+        var firstId = DeterministicId(SeedEntries[0].Content);
+        if (await knowledgeBase.RecordExistsAsync(firstId, cancellationToken))
+            return;
+
         foreach (var (content, category) in SeedEntries)
         {
-            await knowledgeBase.IngestAsync(content, category, cancellationToken);
+            var id = DeterministicId(content);
+            await knowledgeBase.IngestAsync(content, category, id, cancellationToken);
         }
     }
 }

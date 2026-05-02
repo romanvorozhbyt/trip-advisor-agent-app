@@ -13,7 +13,13 @@ public interface IKnowledgeBaseService
     /// <summary>
     /// Ingests a new piece of knowledge, generating its embedding and storing it.
     /// </summary>
-    Task IngestAsync(string content, string category, CancellationToken cancellationToken = default);
+    /// <param name="id">Optional deterministic ID; a new GUID is generated when null.</param>
+    Task IngestAsync(string content, string category, Guid? id = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns true if a record with the given ID already exists in the collection.
+    /// </summary>
+    Task<bool> RecordExistsAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Searches the knowledge base for entries semantically similar to the query.

@@ -13,7 +13,7 @@ declare const google: {
       disableAutoSelect: () => void;
     };
   };
-};
+} | undefined;
 
 const TOKEN_KEY = 'trip-advisor-token';
 const USER_KEY = 'trip-advisor-user';
@@ -55,6 +55,8 @@ export class AuthService implements OnDestroy {
   }
 
   initializeGoogleSignIn(buttonElementId: string): void {
+    if (typeof google === 'undefined') return;
+
     google.accounts.id.initialize({
       client_id: environment.googleClientId,
       auto_select: false,
@@ -161,7 +163,9 @@ export class AuthService implements OnDestroy {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(EXPIRES_AT_KEY);
-    google.accounts.id.disableAutoSelect();
+    if (typeof google !== 'undefined') {
+      google.accounts.id.disableAutoSelect();
+    }
     this.router.navigate(['/login']);
   }
 

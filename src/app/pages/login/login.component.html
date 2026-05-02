@@ -1,0 +1,33 @@
+<div class="login-page">
+  <div class="card">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">🌍</span>
+      <h1>Trip Advisor Agent</h1>
+      <p>Your AI-powered travel companion</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sign-in-section">
+      <p class="sign-in-label">Sign in to start planning your next adventure</p>
+
+      @if (signingIn()) {
+        <div class="loading-state" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Signing you in…</span>
+        </div>
+      }
+
+      <div
+        id="google-btn"
+        role="button"
+        aria-label="Sign in with Google"
+        [class.hidden]="signingIn()"
+      ></div>
+
+      @if (signInError()) {
+        <p class="error" role="alert">{{ signInError() }}</p>
+      }
+    </div>
+  </div>
+</div>

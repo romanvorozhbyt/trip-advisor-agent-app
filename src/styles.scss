@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+
+:root {
+  --clr-primary: #4f46e5;
+  --clr-primary-700: #4338ca;
+  --clr-primary-200: #c7d2fe;
+  --clr-surface: #ffffff;
+  --clr-surface-50: #f8fafc;
+  --clr-surface-100: #f1f5f9;
+  --clr-border: #e2e8f0;
+  --clr-border-2: #cbd5e1;
+  --clr-text: #1e293b;
+  --clr-text-2: #475569;
+  --clr-text-3: #64748b;
+  --clr-muted: #94a3b8;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --transition: 150ms ease;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-sans);
+  background: var(--clr-surface-50);
+  color: var(--clr-text);
+  -webkit-font-smoothing: antialiased;
+}
+
